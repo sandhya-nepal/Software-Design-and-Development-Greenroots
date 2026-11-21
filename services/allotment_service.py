@@ -116,7 +116,7 @@ class AllotmentService:
         self.get_site(plot.site_id).remove_plot_id(plot_id)
 
     def plot_blockers(self, plot):
-        return []
+        return self._allocation_blockers(lambda a: a.plot_id == plot.plot_id, "plot")
 
     # ----------------------------------------------------------- holders
     def suggest_holder_id(self):
@@ -161,4 +161,12 @@ class AllotmentService:
         del self._store.holders[holder_id]
 
     def holder_blockers(self, holder):
-        return []
+        return self._allocation_blockers(lambda a: a.holder_id == holder.holder_id, "holder")
+
+    def _allocation_blockers(self, matches, noun):
+        related = [a for a in self._store.allocations.values() if matches(a)]
+        if not related:
+            return []
+        active = sum(1 for a in related if a.is_active)
+        return [f"this {noun} is referenced by {len(related)} allocation record(s) ({active} active); "
+                "allocation history must be preserved"]

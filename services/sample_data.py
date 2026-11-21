@@ -1,4 +1,10 @@
 """Fictional sample data, created through the service layer."""
+from datetime import date, timedelta
+
+
+def ago(days):
+    """Dates are relative to today so the sample data is always valid (never in the future)."""
+    return (date.today() - timedelta(days=days)).isoformat()
 
 
 def populate(app):
@@ -35,3 +41,11 @@ def populate(app):
     ]
     for person in people:
         allotment.add_holder(*person)
+    allocations = [
+        ("PLOT-001", "HLD-001", ago(300)), ("PLOT-003", "HLD-002", ago(280)),
+        ("PLOT-004", "HLD-001", ago(250)), ("PLOT-006", "HLD-003", ago(290)),
+        ("PLOT-008", "HLD-004", ago(220)), ("PLOT-010", "HLD-005", ago(270)),
+        ("PLOT-012", "HLD-002", ago(190)),
+    ]
+    for plot_id, holder_id, when in allocations:
+        app.allocation.create_allocation(plot_id, holder_id, when)

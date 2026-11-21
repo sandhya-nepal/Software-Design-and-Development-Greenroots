@@ -1,4 +1,5 @@
 """Central coordinator: owns the in-memory collections and the services."""
+from .allocation_service import AllocationService
 from .allotment_service import AllotmentService
 from .id_generator import IdGenerator
 
@@ -10,6 +11,7 @@ class DataStore:
         self.sites = {}
         self.plots = {}
         self.holders = {}
+        self.allocations = {}
 
 
 class ApplicationService:
@@ -17,6 +19,7 @@ class ApplicationService:
         self.store = DataStore()
         self.ids = IdGenerator()
         self.allotment = AllotmentService(self.store, self.ids)
+        self.allocation = AllocationService(self.store, self.ids)
         if load_sample_data:
             from .sample_data import populate
             populate(self)
