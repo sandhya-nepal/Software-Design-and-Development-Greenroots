@@ -15,6 +15,7 @@ class DashboardView(BaseView):
             "  - Allotment Sites: register sites, managers and shared facilities.",
             "  - Plots: add plots to sites and review their occupancy status.",
             "  - Plot Holders: register standard and concessionary members.",
+            "  - Allocations: assign available plots to holders and keep occupancy up to date.",
         ]
         for line in intro:
             ttk.Label(self.body, text=line).pack(anchor="w", pady=2)

@@ -2,6 +2,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from ui.allocation_view import AllocationView
 from ui.dashboard import DashboardView
 from ui.holder_view import HolderView
 from ui.plot_view import PlotView
@@ -13,6 +14,7 @@ NAV_ITEMS = [
     ("sites", "Allotment Sites", SiteView),
     ("plots", "Plots", PlotView),
     ("holders", "Plot Holders", HolderView),
+    ("allocations", "Allocations", AllocationView),
 ]
 
 
