@@ -16,6 +16,8 @@ class DashboardView(BaseView):
             "  - Plots: add plots to sites and review their occupancy status.",
             "  - Plot Holders: register standard and concessionary members.",
             "  - Allocations: assign available plots to holders and keep occupancy up to date.",
+            "  - Maintenance Charges: generate yearly charges with membership discounts.",
+            "  - Payments and Receipts: record simulated payments and instalments.",
         ]
         for line in intro:
             ttk.Label(self.body, text=line).pack(anchor="w", pady=2)

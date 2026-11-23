@@ -4,6 +4,7 @@ from tkinter import messagebox, ttk
 
 from ui.allocation_view import AllocationView
 from ui.dashboard import DashboardView
+from ui.finance_view import ChargesView, PaymentsView
 from ui.holder_view import HolderView
 from ui.plot_view import PlotView
 from ui.site_view import SiteView
@@ -15,6 +16,8 @@ NAV_ITEMS = [
     ("plots", "Plots", PlotView),
     ("holders", "Plot Holders", HolderView),
     ("allocations", "Allocations", AllocationView),
+    ("charges", "Maintenance Charges", ChargesView),
+    ("payments", "Payments and Receipts", PaymentsView),
 ]
 
 
