@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from models import (BANK_TRANSFER, CANCELLED, CASH, FAILED, PAYMENT_METHODS, SIMULATED_CARD, SUCCESSFUL,
-                    MaintenanceCharge, Payment)
+                    MaintenanceCharge, Payment, PaymentReceipt)
 from validation import (CENT, BusinessRuleError, DuplicateError, NotFoundError, ValidationError,
                         parse_date, require_text, to_money)
 from decimal import ROUND_HALF_UP
@@ -144,9 +144,46 @@ class FinanceService:
         self._store.payments[payment.payment_id] = payment
         if payment.is_successful:
             self._recalculate(charge)
+            self.generate_receipt(payment.payment_id)
         return payment
 
     def _recalculate(self, charge):
         total = sum((p.amount for p in self._store.payments.values()
                      if p.charge_id == charge.charge_id and p.is_successful), Decimal("0.00"))
         charge.set_amount_paid(total)
+
+    # ---------------------------------------------------------- receipts
+    def generate_receipt(self, payment_id):
+        """Issue (or return the existing) receipt. Only successful payments qualify."""
+        payment = self.get_payment(payment_id)
+        if not payment.is_successful:
+            raise BusinessRuleError("A receipt can only be generated for a successful payment.")
+        existing = self.get_receipt_for_payment(payment_id)
+        if existing:
+            return existing
+        charge = self.get_charge(payment.charge_id)
+        paid_so_far = Decimal("0.00")
+        for earlier in self._store.payments.values():  # insertion order = chronological order
+            if earlier.charge_id == charge.charge_id and earlier.is_successful:
+                paid_so_far += earlier.amount
+            if earlier.payment_id == payment_id:
+                break
+        holder = self._store.holders[payment.holder_id]
+        receipt = PaymentReceipt(self._ids.next_id("RCP", self._store.receipts), payment.payment_id,
+                                 payment.transaction_reference, holder.holder_id, holder.full_name, charge.charge_id,
+                                 payment.amount, payment.payment_date, payment.payment_method,
+                                 charge.total_amount - paid_so_far, payment.transaction_status)
+        self._store.receipts[receipt.receipt_id] = receipt
+        return receipt
+
+    def get_receipt(self, receipt_id):
+        try:
+            return self._store.receipts[receipt_id]
+        except KeyError:
+            raise NotFoundError(f"Receipt '{receipt_id}' does not exist.")
+
+    def get_receipt_for_payment(self, payment_id):
+        return next((r for r in self._store.receipts.values() if r.payment_id == payment_id), None)
+
+    def list_receipts(self, holder_id=None):
+        return [r for r in self._store.receipts.values() if not holder_id or r.holder_id == holder_id]

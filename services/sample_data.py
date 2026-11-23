@@ -49,3 +49,24 @@ def populate(app):
     ]
     for plot_id, holder_id, when in allocations:
         app.allocation.create_allocation(plot_id, holder_id, when)
+
+    finance = app.finance
+    for allocation_id in ("ALC-001", "ALC-002", "ALC-003", "ALC-004", "ALC-005", "ALC-006", "ALC-007"):
+        finance.generate_charge(allocation_id, str(date.today().year))
+    ok = "Successful"
+    finance.record_payment("CHG-001", "25.00", "Cash", ago(180), ok)                 # paid in full
+    finance.record_payment("CHG-002", "10.00", "Bank Transfer", ago(170), ok)        # instalment 1
+    finance.record_payment("CHG-002", "10.00", "Bank Transfer", ago(140), ok)        # instalment 2
+    finance.record_payment("CHG-004", "5.00", "Cash", ago(165), ok)                  # partially paid
+    finance.record_payment("CHG-005", "37.50", "Simulated Card Payment", ago(150), "Failed")  # failed: no effect
+    finance.record_payment("CHG-006", "37.50", "Simulated Card Payment", ago(160), ok)  # paid in full
+
+    notices = app.announcements
+    notices.create_announcement("SITE-001", "Scheduled maintenance: water supply",
+                                "The water supply will be shut off on Saturday morning while the main taps are replaced.", ago(20))
+    notices.create_announcement("SITE-002", "Community gardening event",
+                                "Join us on the first Sunday of the month to plant the shared herb bed. Tools and tea provided.", ago(15))
+    notices.create_announcement("SITE-003", "Temporary closure of the tool shed",
+                                "The tool shed is closed until further notice while the roof is repaired.", ago(10))
+    notices.create_announcement("SITE-001", "Community notice: winter plot inspections",
+                                "Plot inspections take place next month. Please tidy paths and cover bare soil.", ago(7))

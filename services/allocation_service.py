@@ -71,6 +71,9 @@ class AllocationService:
         return {"allocation": a, "plot": plot, "holder": self._store.holders[a.holder_id],
                 "site": self._store.sites[plot.site_id]}
 
+    def _charges_for(self, allocation_id):
+        return [c for c in self._store.charges.values() if c.allocation_id == allocation_id]
+
     # ------------------------------------------------------- operations
     def create_allocation(self, plot_id, holder_id, allocation_date=None, allocation_id=None):
         holder = self._holder(holder_id)
@@ -96,6 +99,9 @@ class AllocationService:
         if changing_plot and not self.is_plot_available(new_plot.plot_id):
             raise BusinessRuleError(f"Plot '{new_plot.plot_id}' is already allocated.")
         parse_date(allocation_date, "Allocation date", "allocation_date", allow_future=False)
+        if (changing_plot or holder.holder_id != allocation.holder_id) and self._charges_for(allocation_id):
+            raise BusinessRuleError("The plot or holder cannot be changed because maintenance charges already exist "
+                                    "for this allocation. Only the allocation date can be edited.")
         allocation.update(new_plot.plot_id, holder.holder_id, allocation_date)
         if changing_plot:
             old_plot.mark_available()
@@ -107,6 +113,10 @@ class AllocationService:
         allocation = self.get_allocation(allocation_id)
         if not allocation.is_active:
             raise BusinessRuleError("This allocation has already been removed.")
+        unpaid = [c for c in self._charges_for(allocation_id) if c.outstanding_balance > 0]
+        if unpaid:
+            raise BusinessRuleError(f"Allocation {allocation_id} has {len(unpaid)} charge(s) with an outstanding balance. "
+                                    "Settle them before removing the allocation; financial records are always kept.")
         allocation.end()
         self._store.plots[allocation.plot_id].mark_available()
         return allocation

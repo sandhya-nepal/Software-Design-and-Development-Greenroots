@@ -70,6 +70,9 @@ class AllotmentService:
         reasons = []
         if site.plot_ids:
             reasons.append(f"it still contains {len(site.plot_ids)} plot(s)")
+        announcements = sum(1 for a in self._store.announcements.values() if a.site_id == site.site_id)
+        if announcements:
+            reasons.append(f"it has {announcements} announcement(s)")
         return reasons
 
     # ------------------------------------------------------------- plots
