@@ -15,6 +15,10 @@ FONT_BOLD = ("Segoe UI", 10, "bold")
 FONT_TITLE = ("Segoe UI", 20, "bold")
 
 
+def fmt_money(amount):
+    return f"£{amount:,.2f}"
+
+
 def apply_theme(root):
     root.configure(bg=COLORS["page"])
     style = ttk.Style(root)
@@ -105,7 +109,7 @@ Field = namedtuple("Field", "key label kind choices readonly hint", defaults=("t
 class FormDialog(tk.Toplevel):
     """Modal form built from Field definitions. on_submit(values) may raise GreenRootsError."""
 
-    def __init__(self, parent, title, fields, on_submit, initial=None, submit_text="Save"):
+    def __init__(self, parent, title, fields, on_submit, initial=None, submit_text="Save", note=""):
         super().__init__(parent)
         self.title(title)
         self.configure(bg=COLORS["page"])
@@ -116,14 +120,19 @@ class FormDialog(tk.Toplevel):
         initial = initial or {}
         body = ttk.Frame(self, padding=18)
         body.pack(fill="both", expand=True)
-        for row, field in enumerate(fields):
+        offset = 0
+        if note:
+            ttk.Label(body, text=note, style="Muted.TLabel", wraplength=480).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
+            offset = 1
+        for index, field in enumerate(fields):
+            row = index + offset
             ttk.Label(body, text=field.label).grid(row=row, column=0, sticky="nw", padx=(0, 12), pady=6)
             widget = self._build_input(body, field, initial.get(field.key, ""))
             widget.grid(row=row, column=1, sticky="ew", pady=6)
             if field.hint:
                 ttk.Label(body, text=field.hint, style="Muted.TLabel").grid(row=row, column=2, sticky="w", padx=(8, 0))
         buttons = ttk.Frame(body)
-        buttons.grid(row=len(fields), column=0, columnspan=3, sticky="e", pady=(14, 0))
+        buttons.grid(row=len(fields) + offset, column=0, columnspan=3, sticky="e", pady=(14, 0))
         ttk.Button(buttons, text="Cancel", command=self.destroy).pack(side="right", padx=(8, 0))
         ttk.Button(buttons, text=submit_text, style="Accent.TButton", command=self._submit).pack(side="right")
         self.bind("<Escape>", lambda event: self.destroy())
