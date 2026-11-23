@@ -5,8 +5,10 @@ from tkinter import messagebox, ttk
 from ui.allocation_view import AllocationView
 from ui.dashboard import DashboardView
 from ui.finance_view import ChargesView, PaymentsView
+from ui.announcement_view import AnnouncementView
 from ui.holder_view import HolderView
 from ui.plot_view import PlotView
+from ui.report_view import ReportView
 from ui.site_view import SiteView
 from ui.widgets import COLORS, FONT, FONT_BOLD, apply_theme
 
@@ -18,6 +20,8 @@ NAV_ITEMS = [
     ("allocations", "Allocations", AllocationView),
     ("charges", "Maintenance Charges", ChargesView),
     ("payments", "Payments and Receipts", PaymentsView),
+    ("reports", "Reports", ReportView),
+    ("announcements", "Announcements", AnnouncementView),
 ]
 
 

@@ -1,13 +1,42 @@
 """Maintenance charge and payment pages."""
 import tkinter as tk
 from datetime import date
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from models import (CANCELLED, FAILED, PARTIALLY_PAID, PAID, PAYMENT_METHODS, SUCCESSFUL,
                     TRANSACTION_STATUSES, UNPAID)
 from ui.widgets import BaseView, ChoiceFilter, DataTable, Field, FormDialog, fmt_money
 
 SIMULATION_NOTE = "Payments are simulated. No real money is transferred."
+
+
+class ReceiptDialog(tk.Toplevel):
+    """Shows a receipt and lets the user save it as a text file (user-initiated)."""
+
+    def __init__(self, parent, receipt):
+        super().__init__(parent)
+        self.title(f"Receipt {receipt.receipt_id}")
+        self.transient(parent.winfo_toplevel())
+        self._receipt = receipt
+        box = tk.Text(self, width=52, height=17, font=("Consolas", 10), bg="white", relief="solid", bd=1)
+        box.insert("1.0", receipt.render())
+        box.configure(state="disabled")
+        box.pack(padx=14, pady=(14, 8))
+        buttons = ttk.Frame(self)
+        buttons.pack(fill="x", padx=14, pady=(0, 14))
+        ttk.Button(buttons, text="Close", command=self.destroy).pack(side="right")
+        ttk.Button(buttons, text="Save as text file...", command=self.save).pack(side="right", padx=8)
+
+    def save(self):
+        path = filedialog.asksaveasfilename(parent=self, defaultextension=".txt", initialfile=f"{self._receipt.receipt_id}.txt",
+                                            filetypes=[("Text files", "*.txt")])
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(self._receipt.render())
+        except OSError:
+            messagebox.showerror("Could not save", "The receipt could not be saved to that location.", parent=self)
 
 
 def open_payment_form(view, charge_id=None):
@@ -40,6 +69,9 @@ def open_payment_form(view, charge_id=None):
             charge = finance.get_charge(payment.charge_id)
             view.window.notify_success(f"Payment {payment.transaction_reference} recorded ({payment.payment_type}). "
                                        f"Remaining balance: {fmt_money(charge.outstanding_balance)}.")
+            receipt = finance.get_receipt_for_payment(payment.payment_id)
+            if receipt:
+                ReceiptDialog(view, receipt)
         else:
             view.window.set_status(f"Transaction {payment.transaction_reference} {payment.transaction_status.lower()}.", error=True)
             messagebox.showwarning("Transaction not completed", f"The simulated transaction {payment.transaction_reference} "
@@ -105,27 +137,47 @@ class ChargesView(BaseView):
 
 class PaymentsView(BaseView):
     title = "Payments and Receipts"
-    subtitle = "Record simulated payments and review the payment history."
+    subtitle = "Record simulated payments, review the payment history and open receipts."
 
     def __init__(self, parent, app, window):
         super().__init__(parent, app, window)
-        self.add_buttons([("Record Payment", lambda: open_payment_form(self))])
+        self.add_buttons([("Record Payment", lambda: open_payment_form(self)), ("View Receipt", self.view_receipt)])
         self.charge_filter = ChoiceFilter(self.toolbar, "Charge:", self.refresh, "All charges", width=14)
         self.charge_filter.pack(side="left", padx=(20, 8))
         self.status_filter = ChoiceFilter(self.toolbar, "Status:", self.refresh, "All statuses", width=12)
         self.status_filter.pack(side="left")
         ttk.Label(self.body, text=SIMULATION_NOTE, style="Muted.TLabel").pack(anchor="w", pady=(0, 6))
-        self.table = DataTable(self.body, [("id", "Payment", 80), ("ref", "Transaction ref", 110), ("charge", "Charge", 80),
-                                           ("holder", "Plot holder", 160), ("date", "Date", 95), ("amount", "Amount", 80),
-                                           ("method", "Method", 150), ("status", "Status", 90), ("type", "Type", 100)],
-                               height=16, empty_text="No payments recorded yet.")
+        self.notebook = ttk.Notebook(self.body)
+        self.notebook.pack(fill="both", expand=True)
+        payments_tab, receipts_tab = ttk.Frame(self.notebook, padding=8), ttk.Frame(self.notebook, padding=8)
+        self.notebook.add(payments_tab, text="Payment history")
+        self.notebook.add(receipts_tab, text="Receipts")
+        self.table = DataTable(payments_tab, [("id", "Payment", 80), ("ref", "Transaction ref", 110), ("charge", "Charge", 80),
+                                              ("holder", "Plot holder", 160), ("date", "Date", 95), ("amount", "Amount", 80),
+                                              ("method", "Method", 150), ("status", "Status", 90), ("type", "Type", 100)],
+                               height=15, empty_text="No payments recorded yet.")
         self.table.pack(fill="both", expand=True)
+        self.receipt_table = DataTable(receipts_tab, [("id", "Receipt", 80), ("ref", "Transaction ref", 110), ("holder", "Plot holder", 170),
+                                                      ("charge", "Charge", 80), ("amount", "Amount", 80), ("date", "Date", 95),
+                                                      ("method", "Method", 150)],
+                                       height=15, on_activate=lambda rid: self.view_receipt(),
+                                       empty_text="No receipts yet. Receipts are issued for successful payments.")
+        self.receipt_table.pack(fill="both", expand=True)
 
     def refresh(self):
-        self.charge_filter.set_choices([(c.charge_id, c.charge_id) for c in self.app.finance.list_charges()])
+        finance, holders = self.app.finance, self.app.store.holders
+        self.charge_filter.set_choices([(c.charge_id, c.charge_id) for c in finance.list_charges()])
         self.status_filter.set_choices([(s, s) for s in TRANSACTION_STATUSES])
-        payments = self.app.finance.list_payments(self.charge_filter.value or None, None, self.status_filter.value or None)
-        holders = self.app.store.holders
+        payments = finance.list_payments(self.charge_filter.value or None, None, self.status_filter.value or None)
         self.table.set_rows([(p.payment_id, (p.payment_id, p.transaction_reference, p.charge_id, holders[p.holder_id].full_name,
                                              p.payment_date.isoformat(), fmt_money(p.amount), p.payment_method,
                                              p.transaction_status, p.payment_type)) for p in payments])
+        self.receipt_table.set_rows([(r.receipt_id, (r.receipt_id, r.transaction_reference, r.holder_name, r.charge_id,
+                                                     fmt_money(r.amount), r.payment_date.isoformat(), r.payment_method))
+                                     for r in finance.list_receipts()])
+
+    def view_receipt(self):
+        self.notebook.select(1)
+        receipt_id = self.receipt_table.selected_id()
+        if self.need_selection(receipt_id, "receipt"):
+            ReceiptDialog(self, self.app.finance.get_receipt(receipt_id))

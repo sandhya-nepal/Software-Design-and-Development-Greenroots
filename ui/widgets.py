@@ -38,6 +38,21 @@ def apply_theme(root):
     style.map("Treeview", background=[("selected", COLORS["accent"])], foreground=[("selected", "white")])
 
 
+class StatCard(tk.Frame):
+    """A dashboard summary card showing one live figure."""
+
+    def __init__(self, parent, title, accent=None):
+        super().__init__(parent, bg=COLORS["card"], highlightbackground=COLORS["border"], highlightthickness=1,
+                         padx=16, pady=12)
+        tk.Label(self, text=title, bg=COLORS["card"], fg=COLORS["muted"], font=FONT).pack(anchor="w")
+        self.value_label = tk.Label(self, text="-", bg=COLORS["card"], fg=accent or COLORS["sidebar"],
+                                    font=("Segoe UI", 22, "bold"))
+        self.value_label.pack(anchor="w")
+
+    def set(self, value):
+        self.value_label.configure(text=str(value))
+
+
 class DataTable(ttk.Frame):
     """A Treeview with a scrollbar and an empty-state message."""
 
