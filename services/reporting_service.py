@@ -97,3 +97,61 @@ class ReportingService:
                 rows.append({"charge": c, "holder": self._store.holders[c.holder_id],
                              "site": self._store.sites[self._site_of_charge(c)]})
         return rows
+
+    # ----------------------------------------------------------- integrity
+    def verify_integrity(self):
+        """Return a list of human-readable problems. An empty list means everything is consistent."""
+        st, issues = self._store, []
+        for site in st.sites.values():
+            for plot_id in site.plot_ids:
+                plot = st.plots.get(plot_id)
+                if plot is None:
+                    issues.append(f"Site {site.site_id} lists missing plot {plot_id}.")
+                elif plot.site_id != site.site_id:
+                    issues.append(f"Plot {plot_id} is listed by {site.site_id} but belongs to {plot.site_id}.")
+        active = {}
+        for plot in st.plots.values():
+            site = st.sites.get(plot.site_id)
+            if site is None:
+                issues.append(f"Plot {plot.plot_id} belongs to missing site {plot.site_id}.")
+            elif plot.plot_id not in site.plot_ids:
+                issues.append(f"Plot {plot.plot_id} is not listed by its site {site.site_id}.")
+        for a in st.allocations.values():
+            if a.plot_id not in st.plots or a.holder_id not in st.holders:
+                issues.append(f"Allocation {a.allocation_id} refers to a missing plot or holder.")
+            if a.is_active:
+                active.setdefault(a.plot_id, []).append(a.allocation_id)
+        for plot_id, ids in active.items():
+            if len(ids) > 1:
+                issues.append(f"Plot {plot_id} has {len(ids)} active allocations: {', '.join(ids)}.")
+        for plot in st.plots.values():
+            if (not plot.is_available) != (plot.plot_id in active):
+                issues.append(f"Plot {plot.plot_id} occupancy ({plot.occupancy_status}) does not match its allocations.")
+        for c in st.charges.values():
+            allocation = st.allocations.get(c.allocation_id)
+            if allocation is None:
+                issues.append(f"Charge {c.charge_id} refers to missing allocation {c.allocation_id}.")
+            elif (allocation.plot_id, allocation.holder_id) != (c.plot_id, c.holder_id):
+                issues.append(f"Charge {c.charge_id} does not match the plot/holder of its allocation.")
+            paid = sum((p.amount for p in st.payments.values() if p.charge_id == c.charge_id and p.is_successful), ZERO)
+            if paid != c.amount_paid:
+                issues.append(f"Charge {c.charge_id} records £{c.amount_paid} paid but successful payments total £{paid}.")
+            if c.outstanding_balance < 0:
+                issues.append(f"Charge {c.charge_id} has a negative balance.")
+        receipts_per_payment = {}
+        for p in st.payments.values():
+            charge = st.charges.get(p.charge_id)
+            if charge is None or charge.holder_id != p.holder_id:
+                issues.append(f"Payment {p.payment_id} does not match a valid charge and holder.")
+        for r in st.receipts.values():
+            payment = st.payments.get(r.payment_id)
+            if payment is None or not payment.is_successful:
+                issues.append(f"Receipt {r.receipt_id} is not linked to a successful payment.")
+            receipts_per_payment[r.payment_id] = receipts_per_payment.get(r.payment_id, 0) + 1
+        for p in st.payments.values():
+            if p.is_successful and receipts_per_payment.get(p.payment_id, 0) != 1:
+                issues.append(f"Successful payment {p.payment_id} should have exactly one receipt.")
+        for a in st.announcements.values():
+            if a.site_id not in st.sites:
+                issues.append(f"Announcement {a.announcement_id} refers to missing site {a.site_id}.")
+        return issues

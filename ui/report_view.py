@@ -1,5 +1,5 @@
 """Management reports: site summaries, holder overview and outstanding balances."""
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from ui.widgets import BaseView, DataTable, fmt_money
 
@@ -10,11 +10,11 @@ class ReportView(BaseView):
 
     def __init__(self, parent, app, window):
         super().__init__(parent, app, window)
-        self.add_buttons([("Refresh", self.refresh)])
+        self.add_buttons([("Refresh", self.refresh), ("Check Data Integrity", self.check_integrity)])
         notebook = ttk.Notebook(self.body)
         notebook.pack(fill="both", expand=True)
         tabs = {}
-        for key, label in (("sites", "Site summaries"), ("holders", "Plot holder overview"), ("balances", "Outstanding balances")):
+        for key, label in (("sites", "Site summaries"), ("holders", "Plot holder overview"), ("balances", "Outstanding balances"), ("plots", "Plot occupancy")):
             frame = ttk.Frame(notebook, padding=8)
             notebook.add(frame, text=label)
             tabs[key] = frame
@@ -30,7 +30,10 @@ class ReportView(BaseView):
                                                           ("site", "Site", 170), ("total", "Final charge", 95), ("paid", "Paid", 85),
                                                           ("due", "Outstanding", 95), ("status", "Status", 100)],
                                        height=14, empty_text="No outstanding balances.")
-        for table in (self.site_table, self.holder_table, self.balance_table):
+        self.plot_table = DataTable(tabs["plots"], [("plot", "Plot", 80), ("site", "Site", 190), ("size", "Size (sqm)", 90),
+                                                    ("status", "Status", 90), ("holder", "Holder", 170)],
+                                    height=14, empty_text="No plots registered.")
+        for table in (self.site_table, self.holder_table, self.balance_table, self.plot_table):
             table.pack(fill="both", expand=True)
 
     def refresh(self):
@@ -48,3 +51,13 @@ class ReportView(BaseView):
                                                              fmt_money(r["charge"].amount_paid),
                                                              fmt_money(r["charge"].outstanding_balance), r["charge"].payment_status))
                                      for r in reports.outstanding_balances()])
+        self.plot_table.set_rows([(r["plot"].plot_id, (r["plot"].plot_id, r["site"].name, r["plot"].size, r["plot"].occupancy_status,
+                                                       r["holder"].full_name if r["holder"] else "-")) for r in reports.plot_occupancy()])
+
+    def check_integrity(self):
+        issues = self.app.reporting.verify_integrity()
+        if issues:
+            messagebox.showwarning("Data integrity check", f"{len(issues)} problem(s) found:\n\n" + "\n".join(issues[:15]), parent=self)
+        else:
+            messagebox.showinfo("Data integrity check", "All sites, plots, allocations, charges, payments, receipts and "
+                                "announcements are consistent.", parent=self)

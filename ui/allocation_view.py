@@ -14,7 +14,8 @@ class AllocationView(BaseView):
     def __init__(self, parent, app, window):
         super().__init__(parent, app, window)
         self.add_buttons([("New Allocation", self.new_allocation), ("Modify", self.modify_allocation),
-                          ("Remove Allocation", self.remove_allocation)])
+                          ("Remove Allocation", self.remove_allocation),
+                          ("Generate Charge", self.generate_charge)])
         ttk.Label(self.toolbar, text="Search:").pack(side="left", padx=(20, 6))
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", lambda *args: self.refresh())
@@ -81,7 +82,7 @@ class AllocationView(BaseView):
 
     def _save_new(self, v):
         self.app.allocation.create_allocation(v["plot_id"], v["holder_id"], v["allocation_date"], v["allocation_id"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success("Plot allocated successfully.")
 
     def modify_allocation(self):
@@ -99,8 +100,21 @@ class AllocationView(BaseView):
 
     def _save_edit(self, allocation_id, v):
         self.app.allocation.modify_allocation(allocation_id, v["plot_id"], v["holder_id"], v["allocation_date"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success("Allocation updated successfully.")
+
+    def generate_charge(self):
+        allocation_id = self.table.selected_id()
+        if not self.need_selection(allocation_id, "allocation"):
+            return
+        fields = [Field("period", "Charging period", hint="e.g. 2026")]
+        FormDialog(self, f"Generate Charge for {allocation_id}", fields,
+                   lambda v: self._save_charge(allocation_id, v), {"period": str(date.today().year)}, "Generate")
+
+    def _save_charge(self, allocation_id, v):
+        charge = self.app.finance.generate_charge(allocation_id, v["period"])
+        self.window.refresh_all()
+        self.window.notify_success(f"Charge {charge.charge_id} generated for {charge.plot_id}: £{charge.total_amount}.")
 
     def remove_allocation(self):
         allocation_id = self.table.selected_id()

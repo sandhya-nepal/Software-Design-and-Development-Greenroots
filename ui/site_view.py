@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from ui.widgets import BaseView, DataTable, Field, FormDialog
+from ui.widgets import BaseView, DataTable, Field, FormDialog, fmt_money
 from validation import NotFoundError
 
 
@@ -24,7 +24,7 @@ class SiteView(BaseView):
         lower = ttk.Frame(self.body)
         lower.pack(fill="both", expand=True, pady=(12, 0))
         lower.columnconfigure(1, weight=1)
-        self.details = tk.Text(lower, width=46, height=10, font=("Segoe UI", 10), state="disabled", bg="white", relief="solid", bd=1)
+        self.details = tk.Text(lower, width=52, height=17, font=("Segoe UI", 10), state="disabled", bg="white", relief="solid", bd=1)
         self.details.grid(row=0, column=0, sticky="ns", padx=(0, 12))
         self.plot_table = DataTable(lower, [("id", "Plot ID", 90), ("size", "Size (sqm)", 90), ("location", "Location in site", 160),
                                             ("status", "Status", 90)], height=8, empty_text="Select a site to see its plots.")
@@ -45,6 +45,13 @@ class SiteView(BaseView):
             text = (f"{site.name}\n{site.location}\n\nDescription:\n{site.description or '-'}\n\n"
                     f"Site manager: {site.manager.name}\nEmail: {site.manager.email or '-'}\nPhone: {site.manager.phone or '-'}\n\n"
                     f"Facilities: {', '.join(site.facilities) or '-'}")
+            r = self.app.reporting.site_summary(site.site_id)
+            text += (f"\n\n--- Management summary ---\n"
+                     f"Occupancy: {r['occupied_plots']} of {r['total_plots']} plots ({r['occupancy_percentage']}%)\n"
+                     f"Holders with plots: {r['holders_with_allocations']}\n"
+                     f"Charges {fmt_money(r['total_charges'])} | Paid {fmt_money(r['total_payments'])} | "
+                     f"Outstanding {fmt_money(r['outstanding_balance'])}\n"
+                     f"Announcements: {r['announcement_count']}")
             plots = self.app.allotment.list_plots(site_id=site.site_id)
         self.details.configure(state="normal")
         self.details.delete("1.0", "end")
@@ -68,7 +75,7 @@ class SiteView(BaseView):
     def _save_new(self, values):
         self.app.allotment.add_site(values["name"], values["location"], values["description"], values["manager_name"],
                                     values["manager_email"], values["manager_phone"], values["facilities"], values["site_id"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success("Site added successfully.")
 
     def edit_site(self):
@@ -84,7 +91,7 @@ class SiteView(BaseView):
     def _save_edit(self, site_id, values):
         self.app.allotment.update_site(site_id, values["name"], values["location"], values["description"],
                                        values["manager_name"], values["manager_email"], values["manager_phone"], values["facilities"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success("Site updated successfully.")
 
     def delete_site(self):

@@ -72,6 +72,11 @@ class MainWindow(tk.Tk):
         self.pages[key].refresh()
         self.pages[key].tkraise()
 
+    def refresh_all(self):
+        """Reload every page so dashboards, tables and drop-downs reflect the latest data."""
+        for page in self.pages.values():
+            page.refresh()
+
     def set_status(self, message, error=False):
         self.status_var.set(message)
         self.status_label.configure(fg=COLORS["danger"] if error else COLORS["text"])

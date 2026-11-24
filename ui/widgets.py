@@ -1,5 +1,7 @@
 """Reusable Tkinter building blocks shared by every page."""
+import sys
 import tkinter as tk
+import traceback
 from collections import namedtuple
 from tkinter import messagebox, ttk
 
@@ -13,6 +15,13 @@ COLORS = {
 FONT = ("Segoe UI", 10)
 FONT_BOLD = ("Segoe UI", 10, "bold")
 FONT_TITLE = ("Segoe UI", 20, "bold")
+
+
+def report_unexpected(parent, error):
+    """Last-resort handler so an unexpected bug never crashes the window."""
+    traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+    messagebox.showerror("Unexpected problem", "Something went wrong and the operation could not be completed. "
+                         "Please check your entries and try again.", parent=parent)
 
 
 def fmt_money(amount):
@@ -192,6 +201,9 @@ class FormDialog(tk.Toplevel):
         except GreenRootsError as error:
             messagebox.showerror("Cannot save", str(error), parent=self)
             return
+        except Exception as error:
+            report_unexpected(self, error)
+            return
         self.destroy()
 
 
@@ -226,7 +238,10 @@ class BaseView(ttk.Frame):
             self.window.set_status(str(error), error=True)
             messagebox.showerror("Action not completed", str(error), parent=self)
             return False
-        self.refresh()
+        except Exception as error:
+            report_unexpected(self, error)
+            return False
+        self.window.refresh_all()
         if success_message:
             self.window.notify_success(success_message)
         return True

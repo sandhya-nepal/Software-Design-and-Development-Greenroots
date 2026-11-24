@@ -16,9 +16,14 @@ class PlotView(BaseView):
         self.site_filter = ChoiceFilter(self.toolbar, "Site:", self.refresh, "All sites")
         self.site_filter.pack(side="left", padx=(20, 8))
         self.status_filter = ChoiceFilter(self.toolbar, "Status:", self.refresh, "All plots", width=12)
-        self.status_filter.pack(side="left")
+        self.status_filter.pack(side="left", padx=(0, 8))
+        ttk.Label(self.toolbar, text="Search:").pack(side="left", padx=(8, 6))
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *args: self.refresh())
+        ttk.Entry(self.toolbar, textvariable=self.search_var, width=14).pack(side="left")
         self.table = DataTable(self.body, [("id", "Plot ID", 90), ("site", "Site", 220), ("size", "Size (sqm)", 100),
-                                           ("location", "Location in site", 200), ("status", "Status", 100)],
+                                           ("location", "Location in site", 170), ("status", "Status", 90),
+                                           ("holder", "Current holder", 160)],
                                height=16, empty_text="No plots match the current filters.")
         self.table.pack(fill="both", expand=True)
 
@@ -26,8 +31,10 @@ class PlotView(BaseView):
         service = self.app.allotment
         self.site_filter.set_choices([(s.site_id, s.name) for s in service.list_sites()])
         self.status_filter.set_choices([(AVAILABLE, AVAILABLE), (OCCUPIED, OCCUPIED)])
-        plots = service.list_plots(self.site_filter.value or None, self.status_filter.value or None)
-        rows = [(p.plot_id, (p.plot_id, service.get_site(p.site_id).name, p.size, p.location_within_site, p.occupancy_status)) for p in plots]
+        plots = service.list_plots(self.site_filter.value or None, self.status_filter.value or None, self.search_var.get())
+        holders = {r["plot"].plot_id: r["holder"] for r in self.app.reporting.plot_occupancy()}
+        rows = [(p.plot_id, (p.plot_id, service.get_site(p.site_id).name, p.size, p.location_within_site, p.occupancy_status,
+                             holders[p.plot_id].full_name if holders.get(p.plot_id) else "-")) for p in plots]
         self.table.set_rows(rows)
 
     def _site_choices(self):
@@ -40,7 +47,7 @@ class PlotView(BaseView):
 
     def _save_new(self, values):
         self.app.allotment.add_plot(values["site_id"], values["size"], values["location_within_site"], values["plot_id"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success("Plot added successfully.")
 
     def edit_plot(self):
@@ -56,7 +63,7 @@ class PlotView(BaseView):
 
     def _save_edit(self, plot_id, values):
         self.app.allotment.update_plot(plot_id, values["size"], values["location_within_site"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success("Plot updated successfully.")
 
     def delete_plot(self):

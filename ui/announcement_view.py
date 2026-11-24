@@ -54,7 +54,7 @@ class AnnouncementView(BaseView):
 
     def _save_new(self, v):
         self.app.announcements.create_announcement(v["site_id"], v["title"], v["description"], v["publication_date"], v["announcement_id"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success("Announcement published.")
 
     def edit_announcement(self):
@@ -71,7 +71,7 @@ class AnnouncementView(BaseView):
 
     def _save_edit(self, announcement_id, v):
         self.app.announcements.update_announcement(announcement_id, v["title"], v["description"], v["publication_date"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success("Announcement updated.")
 
     def delete_announcement(self):

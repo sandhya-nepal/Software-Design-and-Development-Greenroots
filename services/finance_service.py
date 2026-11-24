@@ -1,5 +1,6 @@
 """Maintenance charges, simulated payments and balances."""
 import random
+import re
 from datetime import date
 from decimal import Decimal
 
@@ -38,6 +39,8 @@ class FinanceService:
         if not allocation.is_active:
             raise BusinessRuleError("Charges can only be generated for active allocations.")
         period = require_text(period or str(date.today().year), "Charging period", "period", 30)
+        if not re.fullmatch(r"\d{4}(/\d{2})?", period):
+            raise ValidationError("Charging period must look like 2026 or 2026/27.", "period")
         if any(c.allocation_id == allocation_id and c.period.lower() == period.lower()
                for c in self._store.charges.values()):
             raise BusinessRuleError(f"A charge for period '{period}' has already been generated for allocation {allocation_id}.")
@@ -134,7 +137,10 @@ class FinanceService:
         if amount > charge.outstanding_balance:
             raise BusinessRuleError(f"Payment of £{amount} exceeds the outstanding balance of £{charge.outstanding_balance}.")
         payment_date = parse_date(payment_date or date.today(), "Payment date", "payment_date", allow_future=False)
-        reference = (transaction_reference or "").strip() or self._ids.next_id("TXN", self._store.payments_by_reference(), 6)
+        supplied = (transaction_reference or "").strip()
+        if supplied and not re.fullmatch(r"[A-Za-z0-9_/\-]{3,40}", supplied):
+            raise ValidationError("Transaction reference must be 3-40 characters: letters, numbers, - _ or /.", "transaction_reference")
+        reference = supplied or self._ids.next_id("TXN", self._store.payments_by_reference(), 6)
         if reference in self._store.payments_by_reference():
             raise DuplicateError(f"Transaction reference '{reference}' has already been used.", "transaction_reference")
         status = outcome or (self._card_simulator(amount) if method == SIMULATED_CARD else SUCCESSFUL)

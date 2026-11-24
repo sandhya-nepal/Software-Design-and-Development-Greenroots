@@ -64,7 +64,7 @@ def open_payment_form(view, charge_id=None):
     def save(v):
         payment = finance.record_payment(v["charge_id"], v["amount"], v["payment_method"], v["payment_date"],
                                          v["outcome"] or None, v["transaction_reference"])
-        view.refresh()
+        view.window.refresh_all()
         if payment.is_successful:
             charge = finance.get_charge(payment.charge_id)
             view.window.notify_success(f"Payment {payment.transaction_reference} recorded ({payment.payment_type}). "
@@ -93,17 +93,22 @@ class ChargesView(BaseView):
         self.search_var.trace_add("write", lambda *args: self.refresh())
         ttk.Entry(self.toolbar, textvariable=self.search_var, width=18).pack(side="left", padx=(0, 8))
         self.status_filter = ChoiceFilter(self.toolbar, "Status:", self.refresh, "All statuses", width=14)
-        self.status_filter.pack(side="left")
+        self.status_filter.pack(side="left", padx=(0, 8))
+        self.site_filter = ChoiceFilter(self.toolbar, "Site:", self.refresh, "All sites", width=20)
+        self.site_filter.pack(side="left")
         self.table = DataTable(self.body, [("id", "Charge", 80), ("period", "Period", 70), ("plot", "Plot", 80),
                                            ("holder", "Plot holder", 160), ("base", "Base", 80), ("discount", "Discount", 80),
                                            ("total", "Final", 80), ("paid", "Paid", 80), ("due", "Outstanding", 90),
                                            ("status", "Status", 110)],
-                               height=16, empty_text="No charges found. Use 'Generate Charge' to create one.")
+                               height=16, on_activate=lambda cid: self.show_breakdown(),
+                               empty_text="No charges found. Use 'Generate Charge' to create one.")
         self.table.pack(fill="both", expand=True)
 
     def refresh(self):
         self.status_filter.set_choices([(s, s) for s in (UNPAID, PARTIALLY_PAID, PAID)])
-        charges = self.app.finance.list_charges(status=self.status_filter.value or None, search=self.search_var.get())
+        self.site_filter.set_choices([(x.site_id, x.name) for x in self.app.allotment.list_sites()])
+        charges = self.app.finance.list_charges(site_id=self.site_filter.value or None,
+                                                status=self.status_filter.value or None, search=self.search_var.get())
         holders = self.app.store.holders
         self.table.set_rows([(c.charge_id, (c.charge_id, c.period, c.plot_id, holders[c.holder_id].full_name,
                                             fmt_money(c.base_amount), fmt_money(c.discount_amount), fmt_money(c.total_amount),
@@ -121,7 +126,7 @@ class ChargesView(BaseView):
 
     def _save_charge(self, v):
         charge = self.app.finance.generate_charge(v["allocation_id"], v["period"])
-        self.refresh()
+        self.window.refresh_all()
         self.window.notify_success(f"Charge {charge.charge_id} generated: {fmt_money(charge.total_amount)}.")
 
     def show_breakdown(self):
