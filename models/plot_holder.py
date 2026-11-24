@@ -27,8 +27,11 @@ class PlotHolder(ABC):
         return self._holder_id
 
     def update(self, full_name, address, email, phone):
+        full_name = require_text(full_name, "Full name", "full_name")
+        if not any(ch.isalpha() for ch in full_name):
+            raise ValidationError("Full name must contain letters.", "full_name")
         checked = (
-            require_text(full_name, "Full name", "full_name"),
+            full_name,
             require_text(address, "Address", "address", 300),
             validate_email(email),
             validate_phone(phone),

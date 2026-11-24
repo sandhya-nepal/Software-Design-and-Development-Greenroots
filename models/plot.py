@@ -1,8 +1,11 @@
 """Allotment plot."""
-from validation import positive_decimal, require_text
+from decimal import Decimal
+
+from validation import ValidationError, positive_decimal, require_text
 
 AVAILABLE = "Available"
 OCCUPIED = "Occupied"
+MAX_PLOT_SIZE = Decimal("10000")
 
 
 class AllotmentPlot:
@@ -32,6 +35,8 @@ class AllotmentPlot:
 
     def update(self, size, location_within_site):
         checked_size = positive_decimal(size, "Plot size", "size")
+        if checked_size > MAX_PLOT_SIZE:
+            raise ValidationError(f"Plot size cannot exceed {MAX_PLOT_SIZE:,} sqm.", "size")
         checked_location = require_text(location_within_site, "Location within site", "location_within_site")
         self.size, self.location_within_site = checked_size, checked_location
 
